@@ -66,21 +66,49 @@
     </button>
 
     <script>
-      const canvas = document.getElementById("canvas");
+   const tabla = document.querySelector("#tablaDatos tbody");
+const codigosCapturados = new Set();
+
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-// Redibujar cada frame recibido
+let bufferCodigos = [];
+const MIN_COINCIDENCIAS = 3;
+
+// =========================
+//     MARCO FIJO AZUL
+// =========================
+function dibujarMarcoFijo() {
+    const w = canvas.width;
+    const h = canvas.height;
+
+    const marcoW = w * 0.6;
+    const marcoH = h * 0.28;
+    const x = (w - marcoW) / 2;
+    const y = (h - marcoH) / 2;
+
+    ctx.beginPath();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "cyan";
+    ctx.rect(x, y, marcoW, marcoH);
+    ctx.stroke();
+}
+
+// =========================
+//    PROCESADO DE QUAGGA
+// =========================
 Quagga.onProcessed(result => {
-    const ctx = canvas.getContext("2d");
     const video = document.getElementById("preview");
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
-    // Limpiar canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Si detecta cajas
+    // Marco fijo azul
+    dibujarMarcoFijo();
+
+    // Cajas secundarias amarillas
     if (result && result.boxes) {
         result.boxes
             .filter(box => box !== result.box)
@@ -97,7 +125,7 @@ Quagga.onProcessed(result => {
             });
     }
 
-    // Caja principal (en verde)
+    // Caja principal verde
     if (result && result.box) {
         ctx.beginPath();
         ctx.strokeStyle = "lime";
@@ -110,7 +138,7 @@ Quagga.onProcessed(result => {
         ctx.stroke();
     }
 
-    // Línea del código detectado
+    // Línea del código rojo
     if (result && result.codeResult && result.line) {
         ctx.beginPath();
         ctx.strokeStyle = "red";
@@ -121,116 +149,126 @@ Quagga.onProcessed(result => {
     }
 });
 
-        const tabla = document.querySelector("#tablaDatos tbody");
-        const codigosCapturados = new Set();
-
-        // ================================
-        // INICIAR SCANNER
-        // ================================
-        document.getElementById("btnStart").onclick = () => {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#preview'),
-                    constraints: { facingMode: "environment" }
-                },
-                decoder: { readers: ["code_128_reader", "ean_reader"] }
-            }, err => {
-                if (err) return alert("Error iniciando cámara: " + err);
-
-                Quagga.start();
-                document.getElementById("btnStart").classList.add("hidden");
-                document.getElementById("btnStop").classList.remove("hidden");
-            });
-
-            Quagga.onDetected(data => {
-                const codigo = data.codeResult.code;
-
-                if (!codigosCapturados.has(codigo)) {
-                    codigosCapturados.add(codigo);
-                    agregarFilaConSchema(codigo);
-                }
-            });
-        };
-
-        // ================================
-        // DETENER SCANNER
-        // ================================
-        document.getElementById("btnStop").onclick = () => {
-            Quagga.stop();
-            document.getElementById("btnStart").classList.remove("hidden");
-            document.getElementById("btnStop").classList.add("hidden");
-        };
-
-        // ================================
-        // SCHEMA AUTOMÁTICO
-        // ================================
-        const schema = {
-            "Nombre Producto": "",
-            "Lote": "",
-            "Fecha Fab": "",
-            "Fecha Exp": "",
-            "PVMP": "",
-            "SAIMED PP": "",
-            "Descripcion": "",
-            "Ubicacion": "",
-            "Usuario": "",
-            "Observaciones": ""
-        };
-
-        // ================================
-        // AGREGAR FILA CON SCHEMA
-        // ================================
-        function agregarFilaConSchema(codigo) {
-            const fila = document.createElement("tr");
-
-            fila.innerHTML = `
-                <td class="border p-2 font-bold">${codigo}</td>
-                ${Object.keys(schema).map(k => `
-                    <td class="border p-2" contenteditable="true">${schema[k]}</td>
-                `).join("")}
-                <td class="border p-2 text-center">
-                    <button class="bg-red-500 text-white px-2 py-1 rounded text-xs eliminar">X</button>
-                </td>
-            `;
-
-            tabla.appendChild(fila);
-
-            fila.querySelector(".eliminar").onclick = () => {
-                codigosCapturados.delete(codigo);
-                fila.remove();
-            };
+// =========================
+//     INICIAR ESCÁNER
+// =========================
+document.getElementById("btnStart").onclick = () => {
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#preview'),
+            constraints: { facingMode: "environment" }
+        },
+        decoder: {
+            readers: ["ean_reader", "code_128_reader"]
         }
+    }, err => {
+        if (err) return alert("Error iniciando cámara: " + err);
 
-        // ================================
-        // EXPORTAR A EXCEL
-        // ================================
-        document.getElementById("btnExcel").onclick = () => {
-            const datos = [];
+        Quagga.start();
+        document.getElementById("btnStart").classList.add("hidden");
+        document.getElementById("btnStop").classList.remove("hidden");
+    });
 
-            document.querySelectorAll("#tablaDatos tbody tr").forEach(tr => {
-                const t = tr.querySelectorAll("td");
-                datos.push({
-                    Codigo: t[0].innerText,
-                    "Nombre Producto": t[1].innerText,
-                    Lote: t[2].innerText,
-                    "Fecha Fab": t[3].innerText,
-                    "Fecha Exp": t[4].innerText,
-                    PVMP: t[5].innerText,
-                    "SAIMED PP": t[6].innerText,
-                    Descripcion: t[7].innerText,
-                    Ubicacion: t[8].innerText,
-                    Usuario: t[9].innerText,
-                    Observaciones: t[10].innerText
-                });
-            });
+    // Detectar códigos con filtro
+    Quagga.onDetected(data => {
+        const codigo = data.codeResult.code;
 
-            const hoja = XLSX.utils.json_to_sheet(datos);
-            const libro = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(libro, hoja, "Datos");
-            XLSX.writeFile(libro, "escaneos.xlsx");
-        };
+        bufferCodigos.push(codigo);
+        if (bufferCodigos.length > 10) bufferCodigos.shift();
+
+        const repeticiones = bufferCodigos.filter(c => c === codigo).length;
+
+        if (repeticiones >= MIN_COINCIDENCIAS) {
+            bufferCodigos = []; // reset
+
+            if (!codigosCapturados.has(codigo)) {
+                codigosCapturados.add(codigo);
+                agregarFilaConSchema(codigo);
+            }
+        }
+    });
+};
+
+// =========================
+//     DETENER ESCÁNER
+// =========================
+document.getElementById("btnStop").onclick = () => {
+    Quagga.stop();
+    document.getElementById("btnStart").classList.remove("hidden");
+    document.getElementById("btnStop").classList.add("hidden");
+};
+
+// =========================
+//     SCHEMA AUTOMÁTICO
+// =========================
+const schema = {
+    "Nombre Producto": "",
+    "Lote": "",
+    "Fecha Fab": "",
+    "Fecha Exp": "",
+    "PVMP": "",
+    "SAIMED PP": "",
+    "Descripcion": "",
+    "Ubicacion": "",
+    "Usuario": "",
+    "Observaciones": ""
+};
+
+// =========================
+//   AGREGAR FILA SCHEMA
+// =========================
+function agregarFilaConSchema(codigo) {
+    const fila = document.createElement("tr");
+
+    fila.innerHTML = `
+        <td class="border p-2 font-bold">${codigo}</td>
+        ${Object.keys(schema).map(k => `
+            <td class="border p-2" contenteditable="true">${schema[k]}</td>
+        `).join("")}
+        <td class="border p-2 text-center">
+            <button class="bg-red-500 text-white px-2 py-1 rounded text-xs eliminar">X</button>
+        </td>
+    `;
+
+    tabla.appendChild(fila);
+
+    fila.querySelector(".eliminar").onclick = () => {
+        codigosCapturados.delete(codigo);
+        fila.remove();
+    };
+}
+
+// =========================
+//   EXPORTAR EXCEL
+// =========================
+document.getElementById("btnExcel").onclick = () => {
+    const datos = [];
+
+    document.querySelectorAll("#tablaDatos tbody tr").forEach(tr => {
+        const t = tr.querySelectorAll("td");
+        datos.push({
+            Codigo: t[0].innerText,
+            "Nombre Producto": t[1].innerText,
+            Lote: t[2].innerText,
+            "Fecha Fab": t[3].innerText,
+            "Fecha Exp": t[4].innerText,
+            PVMP: t[5].innerText,
+            "SAIMED PP": t[6].innerText,
+            Descripcion: t[7].innerText,
+            Ubicacion: t[8].innerText,
+            Usuario: t[9].innerText,
+            Observaciones: t[10].innerText
+        });
+    });
+
+    const hoja = XLSX.utils.json_to_sheet(datos);
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Datos");
+    XLSX.writeFile(libro, "escaneos.xlsx");
+};
+
     </script>
 
 </body>
