@@ -11,16 +11,15 @@
     <!-- QuaggaJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
-    <!-- SheetJS para Excel -->
+    <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 </head>
 
 <body class="bg-gray-100 p-4">
 
     <h1 class="text-2xl font-bold text-center mb-4">Escáner de Códigos de Barras</h1>
 
-    <!-- Contenedor del scanner -->
+    <!-- Scanner -->
     <div class="bg-white p-4 rounded-lg shadow mb-4">
         <video id="preview" class="w-full rounded"></video>
 
@@ -41,8 +40,13 @@
             <thead class="bg-gray-200">
                 <tr>
                     <th class="p-2">Código</th>
+                    <th class="p-2">Nombre Producto</th>
+                    <th class="p-2">Lote</th>
+                    <th class="p-2">Fecha Fab</th>
+                    <th class="p-2">Fecha Exp</th>
+                    <th class="p-2">PVMP</th>
+                    <th class="p-2">SAIMED PP</th>
                     <th class="p-2">Descripción</th>
-                    <th class="p-2">Fecha</th>
                     <th class="p-2">Ubicación</th>
                     <th class="p-2">Usuario</th>
                     <th class="p-2">Observaciones</th>
@@ -59,12 +63,10 @@
 
     <script>
         const tabla = document.querySelector("#tablaDatos tbody");
-
-        // Evitar duplicados
         const codigosCapturados = new Set();
 
         // ================================
-        //      INICIAR SCANNER
+        // INICIAR SCANNER
         // ================================
         document.getElementById("btnStart").onclick = () => {
             Quagga.init({
@@ -72,18 +74,12 @@
                     name: "Live",
                     type: "LiveStream",
                     target: document.querySelector('#preview'),
-                    constraints: {
-                        facingMode: "environment"
-                    }
+                    constraints: { facingMode: "environment" }
                 },
-                decoder: {
-                    readers: ["code_128_reader", "ean_reader"]
-                }
+                decoder: { readers: ["code_128_reader", "ean_reader"] }
             }, err => {
-                if (err) {
-                    alert("Error iniciando cámara: " + err);
-                    return;
-                }
+                if (err) return alert("Error iniciando cámara: " + err);
+
                 Quagga.start();
                 document.getElementById("btnStart").classList.add("hidden");
                 document.getElementById("btnStop").classList.remove("hidden");
@@ -94,13 +90,13 @@
 
                 if (!codigosCapturados.has(codigo)) {
                     codigosCapturados.add(codigo);
-                    agregarFila(codigo);
+                    agregarFilaConSchema(codigo);
                 }
             });
         };
 
         // ================================
-        //      DETENER SCANNER
+        // DETENER SCANNER
         // ================================
         document.getElementById("btnStop").onclick = () => {
             Quagga.stop();
@@ -109,18 +105,32 @@
         };
 
         // ================================
-        //      AGREGAR FILA A TABLA
+        // SCHEMA AUTOMÁTICO
         // ================================
-        function agregarFila(codigo) {
+        const schema = {
+            "Nombre Producto": "",
+            "Lote": "",
+            "Fecha Fab": "",
+            "Fecha Exp": "",
+            "PVMP": "",
+            "SAIMED PP": "",
+            "Descripcion": "",
+            "Ubicacion": "",
+            "Usuario": "",
+            "Observaciones": ""
+        };
+
+        // ================================
+        // AGREGAR FILA CON SCHEMA
+        // ================================
+        function agregarFilaConSchema(codigo) {
             const fila = document.createElement("tr");
 
             fila.innerHTML = `
                 <td class="border p-2 font-bold">${codigo}</td>
-                <td class="border p-2" contenteditable="true"></td>
-                <td class="border p-2" contenteditable="true">${new Date().toLocaleString()}</td>
-                <td class="border p-2" contenteditable="true"></td>
-                <td class="border p-2" contenteditable="true"></td>
-                <td class="border p-2" contenteditable="true"></td>
+                ${Object.keys(schema).map(k => `
+                    <td class="border p-2" contenteditable="true">${schema[k]}</td>
+                `).join("")}
                 <td class="border p-2 text-center">
                     <button class="bg-red-500 text-white px-2 py-1 rounded text-xs eliminar">X</button>
                 </td>
@@ -128,7 +138,6 @@
 
             tabla.appendChild(fila);
 
-            // Evento eliminar
             fila.querySelector(".eliminar").onclick = () => {
                 codigosCapturados.delete(codigo);
                 fila.remove();
@@ -136,26 +145,31 @@
         }
 
         // ================================
-        //      EXPORTAR A EXCEL
+        // EXPORTAR A EXCEL
         // ================================
         document.getElementById("btnExcel").onclick = () => {
             const datos = [];
+
             document.querySelectorAll("#tablaDatos tbody tr").forEach(tr => {
-                const tds = tr.querySelectorAll("td");
+                const t = tr.querySelectorAll("td");
                 datos.push({
-                    Codigo: tds[0].innerText,
-                    Descripcion: tds[1].innerText,
-                    Fecha: tds[2].innerText,
-                    Ubicacion: tds[3].innerText,
-                    Usuario: tds[4].innerText,
-                    Observaciones: tds[5].innerText
+                    Codigo: t[0].innerText,
+                    "Nombre Producto": t[1].innerText,
+                    Lote: t[2].innerText,
+                    "Fecha Fab": t[3].innerText,
+                    "Fecha Exp": t[4].innerText,
+                    PVMP: t[5].innerText,
+                    "SAIMED PP": t[6].innerText,
+                    Descripcion: t[7].innerText,
+                    Ubicacion: t[8].innerText,
+                    Usuario: t[9].innerText,
+                    Observaciones: t[10].innerText
                 });
             });
 
             const hoja = XLSX.utils.json_to_sheet(datos);
             const libro = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(libro, hoja, "Datos");
-
             XLSX.writeFile(libro, "escaneos.xlsx");
         };
     </script>
