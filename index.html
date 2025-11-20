@@ -1,557 +1,164 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Escáner de Códigos de Barras</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner de Códigos</title>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- QuaggaJS (lectura de códigos de barras) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"
-          integrity="sha512-pg7+qIk+9E1DhHSUJoxwH9t70TqEtEzrxDHCaianJ6x4T4/3GNmBnxlvbS9i/uZFHR5S3ykHJv9q4M5d9wqWDA=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- QuaggaJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 
-  <!-- SheetJS (xlsx) para exportar a Excel -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- SheetJS para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <!-- Manifest PWA (opcional) -->
-  <link rel="manifest" href="manifest.webmanifest" />
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
 
-  <!-- NAVBAR -->
-  <header class="bg-sky-700 text-white py-3 shadow">
-    <div class="max-w-5xl mx-auto px-4 flex items-center justify-between">
-      <h1 class="text-lg md:text-2xl font-semibold">Escáner de Códigos de Barras</h1>
-      <span class="hidden sm:inline text-sm opacity-80">Funciona en móviles y PCs</span>
+<body class="bg-gray-100 p-4">
+
+    <h1 class="text-2xl font-bold text-center mb-4">Escáner de Códigos de Barras</h1>
+
+    <!-- Contenedor del scanner -->
+    <div class="bg-white p-4 rounded-lg shadow mb-4">
+        <video id="preview" class="w-full rounded"></video>
+
+        <button id="btnStart" class="w-full bg-blue-600 text-white py-2 px-4 rounded mt-3">
+            Iniciar Escáner
+        </button>
+
+        <button id="btnStop" class="w-full bg-red-600 text-white py-2 px-4 rounded mt-3 hidden">
+            Detener Escáner
+        </button>
     </div>
-  </header>
 
-  <!-- MAIN -->
-  <main class="flex-1 max-w-5xl mx-auto w-full px-4 py-4 md:py-6 space-y-4">
+    <!-- Tabla -->
+    <h2 class="text-xl font-bold mb-2">Datos Escaneados</h2>
 
-    <!-- Controles principales -->
-    <section class="bg-white rounded-xl shadow p-4 md:p-6 space-y-4">
-      <h2 class="text-lg md:text-xl font-semibold flex items-center gap-2">
-        <span>1. Cámara y escaneo</span>
-        <span class="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full">getUserMedia + QuaggaJS</span>
-      </h2>
-
-      <!-- Mensajes de estado -->
-      <div id="statusMessage"
-           class="hidden text-sm px-3 py-2 rounded border"></div>
-
-      <!-- Controles de cámara -->
-      <div class="flex flex-wrap gap-2">
-        <button id="btnStart"
-                class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium">
-          Iniciar escáner
-        </button>
-        <button id="btnStop"
-                class="px-4 py-2 rounded-lg bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium disabled:opacity-50"
-                disabled>
-          Detener escáner
-        </button>
-        <button id="btnClear"
-                class="ml-auto px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium">
-          Limpiar tabla
-        </button>
-      </div>
-
-      <!-- Contenedor de video / cámara -->
-      <div class="mt-4">
-        <div class="relative w-full max-w-md mx-auto rounded-xl overflow-hidden bg-black aspect-video">
-          <!-- Quagga montará el stream de video aquí -->
-          <div id="interactive" class="w-full h-full"></div>
-          <!-- Linea de ayuda al usuario -->
-          <div class="pointer-events-none absolute inset-x-6 top-1/2 -translate-y-1/2 border-y-2 border-red-500 opacity-70"></div>
-        </div>
-        <p class="mt-2 text-xs text-gray-500 text-center">
-          Consejo: apunte la cámara al código de barras y manténgalo fijo unos segundos.
-        </p>
-      </div>
-    </section>
-
-    <!-- Datos adicionales -->
-    <section class="bg-white rounded-xl shadow p-4 md:p-6 space-y-4">
-      <h2 class="text-lg md:text-xl font-semibold">
-        2. Datos del escaneo
-      </h2>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Descripción (opcional)</label>
-          <input id="inputDescripcion" type="text"
-                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                 placeholder="Ej. Producto X, Lote 123" />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
-          <input id="inputUbicacion" type="text"
-                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                 placeholder="Ej. Almacén A, Pasillo 3" />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
-          <input id="inputUsuario" type="text"
-                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                 placeholder="Nombre del operador" />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            Observaciones
-          </label>
-          <input id="inputObservaciones" type="text"
-                 class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                 placeholder="Notas adicionales..." />
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
-        <button id="btnAddManual"
-                class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium">
-          Agregar código manual
-        </button>
-        <input id="inputCodigoManual" type="text"
-               class="flex-1 min-w-[150px] border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-               placeholder="Código de barras / texto" />
-      </div>
-    </section>
-
-    <!-- Tabla de resultados y exportación -->
-    <section class="bg-white rounded-xl shadow p-4 md:p-6 space-y-4">
-      <div class="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
-        <h2 class="text-lg md:text-xl font-semibold">
-          3. Códigos escaneados
-        </h2>
-
-        <div class="flex gap-2 flex-wrap">
-          <button id="btnExport"
-                  class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-60"
-                  disabled>
-            Exportar a Excel
-          </button>
-        </div>
-      </div>
-
-      <!-- Filtro rápido -->
-      <div class="flex items-center gap-2">
-        <input id="inputFiltro" type="text"
-               class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-               placeholder="Filtrar por código, descripción, ubicación o usuario..." />
-      </div>
-
-      <!-- Tabla -->
-      <div class="overflow-x-auto border rounded-xl">
-        <table class="min-w-full text-sm">
-          <thead class="bg-gray-100 text-gray-700 text-xs uppercase">
-            <tr>
-              <th class="px-3 py-2 text-left">#</th>
-              <th class="px-3 py-2 text-left">Código</th>
-              <th class="px-3 py-2 text-left">Descripción</th>
-              <th class="px-3 py-2 text-left">Fecha escaneo</th>
-              <th class="px-3 py-2 text-left">Ubicación</th>
-              <th class="px-3 py-2 text-left">Usuario</th>
-              <th class="px-3 py-2 text-left">Observaciones</th>
-              <th class="px-3 py-2 text-center">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody" class="divide-y divide-gray-100">
-            <!-- filas generadas por JS -->
-          </tbody>
+    <div class="overflow-x-auto bg-white p-4 rounded shadow">
+        <table class="w-full text-sm" id="tablaDatos">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="p-2">Código</th>
+                    <th class="p-2">Descripción</th>
+                    <th class="p-2">Fecha</th>
+                    <th class="p-2">Ubicación</th>
+                    <th class="p-2">Usuario</th>
+                    <th class="p-2">Observaciones</th>
+                    <th class="p-2">Acciones</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
         </table>
-      </div>
+    </div>
 
-      <p class="text-xs text-gray-500">
-        Las celdas de <strong>Descripción</strong>, <strong>Ubicación</strong>, <strong>Usuario</strong> y
-        <strong>Observaciones</strong> son editables directamente en la tabla.
-      </p>
-    </section>
-  </main>
+    <button id="btnExcel" class="w-full bg-green-600 text-white py-2 px-4 rounded mt-4">
+        Exportar a Excel
+    </button>
 
-  <!-- FOOTER -->
-  <footer class="text-center text-xs text-gray-400 py-3">
-    Escáner offline (PWA opcional) · Usa cámara del dispositivo y exporta a Excel
-  </footer>
+    <script>
+        const tabla = document.querySelector("#tablaDatos tbody");
 
-  <!-- JS principal -->
-  <script>
-    // ==============================
-    // Estado de la aplicación
-    // ==============================
-    let scans = [];          // Array de objetos {code, description, dateISO, location, user, notes}
-    let scannedCodes = new Set();  // Para validar duplicados
-    let isScanning = false;
+        // Evitar duplicados
+        const codigosCapturados = new Set();
 
-    const statusMessage = document.getElementById("statusMessage");
-    const tableBody = document.getElementById("tableBody");
-    const btnStart = document.getElementById("btnStart");
-    const btnStop = document.getElementById("btnStop");
-    const btnClear = document.getElementById("btnClear");
-    const btnAddManual = document.getElementById("btnAddManual");
-    const inputCodigoManual = document.getElementById("inputCodigoManual");
-    const btnExport = document.getElementById("btnExport");
-    const inputFiltro = document.getElementById("inputFiltro");
+        // ================================
+        //      INICIAR SCANNER
+        // ================================
+        document.getElementById("btnStart").onclick = () => {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#preview'),
+                    constraints: {
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: ["code_128_reader", "ean_reader"]
+                }
+            }, err => {
+                if (err) {
+                    alert("Error iniciando cámara: " + err);
+                    return;
+                }
+                Quagga.start();
+                document.getElementById("btnStart").classList.add("hidden");
+                document.getElementById("btnStop").classList.remove("hidden");
+            });
 
-    const inputDescripcion = document.getElementById("inputDescripcion");
-    const inputUbicacion = document.getElementById("inputUbicacion");
-    const inputUsuario = document.getElementById("inputUsuario");
-    const inputObservaciones = document.getElementById("inputObservaciones");
+            Quagga.onDetected(data => {
+                const codigo = data.codeResult.code;
 
-    // ==============================
-    // Utilidades
-    // ==============================
-    function showStatus(msg, isError = false) {
-      statusMessage.textContent = msg;
-      statusMessage.classList.remove("hidden", "border-red-500", "bg-red-50", "text-red-700",
-                                     "border-green-500", "bg-green-50", "text-green-700");
-      if (isError) {
-        statusMessage.classList.add("border-red-500", "bg-red-50", "text-red-700");
-      } else {
-        statusMessage.classList.add("border-green-500", "bg-green-50", "text-green-700");
-      }
+                if (!codigosCapturados.has(codigo)) {
+                    codigosCapturados.add(codigo);
+                    agregarFila(codigo);
+                }
+            });
+        };
 
-      // Ocultar automáticamente después de unos segundos
-      setTimeout(() => {
-        statusMessage.classList.add("hidden");
-      }, 4000);
-    }
+        // ================================
+        //      DETENER SCANNER
+        // ================================
+        document.getElementById("btnStop").onclick = () => {
+            Quagga.stop();
+            document.getElementById("btnStart").classList.remove("hidden");
+            document.getElementById("btnStop").classList.add("hidden");
+        };
 
-    function formatDate(dateISO) {
-      const d = new Date(dateISO);
-      if (Number.isNaN(d.getTime())) return "";
-      // Formato: DD/MM/YYYY HH:mm:ss
-      return d.toLocaleString(undefined, {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      });
-    }
+        // ================================
+        //      AGREGAR FILA A TABLA
+        // ================================
+        function agregarFila(codigo) {
+            const fila = document.createElement("tr");
 
-    function refreshButtonsState() {
-      btnExport.disabled = scans.length === 0;
-    }
+            fila.innerHTML = `
+                <td class="border p-2 font-bold">${codigo}</td>
+                <td class="border p-2" contenteditable="true"></td>
+                <td class="border p-2" contenteditable="true">${new Date().toLocaleString()}</td>
+                <td class="border p-2" contenteditable="true"></td>
+                <td class="border p-2" contenteditable="true"></td>
+                <td class="border p-2" contenteditable="true"></td>
+                <td class="border p-2 text-center">
+                    <button class="bg-red-500 text-white px-2 py-1 rounded text-xs eliminar">X</button>
+                </td>
+            `;
 
-    // ==============================
-    // Gestión de tabla
-    // ==============================
-    function renderTable() {
-      const filter = inputFiltro.value.trim().toLowerCase();
+            tabla.appendChild(fila);
 
-      tableBody.innerHTML = "";
-      scans
-        .map((item, idx) => ({ idx, item }))
-        .filter(({ item }) => {
-          if (!filter) return true;
-          const text = [
-            item.code,
-            item.description,
-            item.location,
-            item.user,
-            item.notes
-          ].join(" ").toLowerCase();
-          return text.includes(filter);
-        })
-        .forEach(({ idx, item }, visibleIndex) => {
-          const tr = document.createElement("tr");
-          tr.dataset.index = idx;
-
-          tr.innerHTML = `
-            <td class="px-3 py-2 text-xs text-gray-500">${visibleIndex + 1}</td>
-            <td class="px-3 py-2 font-mono text-xs md:text-sm break-all">${item.code}</td>
-            <td class="px-3 py-2">
-              <div contenteditable="true"
-                   data-field="description"
-                   class="outline-none min-w-[100px] text-xs md:text-sm">
-                ${item.description ? escapeHtml(item.description) : ""}
-              </div>
-            </td>
-            <td class="px-3 py-2 text-xs md:text-sm text-gray-700 whitespace-nowrap">
-              ${formatDate(item.dateISO)}
-            </td>
-            <td class="px-3 py-2">
-              <div contenteditable="true"
-                   data-field="location"
-                   class="outline-none min-w-[80px] text-xs md:text-sm">
-                ${item.location ? escapeHtml(item.location) : ""}
-              </div>
-            </td>
-            <td class="px-3 py-2">
-              <div contenteditable="true"
-                   data-field="user"
-                   class="outline-none min-w-[80px] text-xs md:text-sm">
-                ${item.user ? escapeHtml(item.user) : ""}
-              </div>
-            </td>
-            <td class="px-3 py-2">
-              <div contenteditable="true"
-                   data-field="notes"
-                   class="outline-none min-w-[80px] text-xs md:text-sm">
-                ${item.notes ? escapeHtml(item.notes) : ""}
-              </div>
-            </td>
-            <td class="px-3 py-2 text-center">
-              <button data-action="delete"
-                      class="px-2 py-1 text-xs rounded bg-red-100 hover:bg-red-200 text-red-700">
-                Eliminar
-              </button>
-            </td>
-          `;
-
-          tableBody.appendChild(tr);
-        });
-
-      refreshButtonsState();
-    }
-
-    function escapeHtml(text) {
-      return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
-
-    function addScan(code, fromManual = false) {
-      if (!code) return;
-
-      if (scannedCodes.has(code)) {
-        showStatus(`El código ${code} ya fue escaneado (duplicado)`, true);
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const newItem = {
-        code: code.trim(),
-        description: inputDescripcion.value.trim(),
-        dateISO: now,
-        location: inputUbicacion.value.trim(),
-        user: inputUsuario.value.trim(),
-        notes: inputObservaciones.value.trim()
-      };
-
-      scans.unshift(newItem);
-      scannedCodes.add(newItem.code);
-
-      renderTable();
-
-      showStatus(fromManual
-        ? `Código manual "${code}" agregado.`
-        : `Código "${code}" escaneado correctamente.`);
-
-      // Limpia el input manual después de agregar
-      if (fromManual) {
-        inputCodigoManual.value = "";
-      }
-    }
-
-    function deleteScanAtIndex(idx) {
-      const item = scans[idx];
-      if (!item) return;
-      scannedCodes.delete(item.code);
-      scans.splice(idx, 1);
-      renderTable();
-      showStatus(`Entrada con código "${item.code}" eliminada.`);
-    }
-
-    // ==============================
-    // Escáner (Quagga + getUserMedia)
-    // ==============================
-    function startScanner() {
-      if (isScanning) return;
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showStatus("Este navegador no soporta acceso a la cámara (getUserMedia).", true);
-        return;
-      }
-
-      isScanning = true;
-      btnStart.disabled = true;
-      btnStop.disabled = false;
-
-      // Configuración básica de Quagga para códigos lineales
-      Quagga.init({
-        inputStream: {
-          type: "LiveStream",
-          target: document.querySelector("#interactive"),
-          constraints: {
-            facingMode: "environment", // cámara trasera si está disponible
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        },
-        decoder: {
-          readers: [
-            "code_128_reader",
-            "ean_reader",
-            "ean_8_reader",
-            "upc_reader",
-            "upc_e_reader",
-            "code_39_reader"
-            // Para agregar otros tipos, se pueden incluir más "readers".
-          ]
-        },
-        locate: true,
-        numOfWorkers: navigator.hardwareConcurrency || 2
-      }, function (err) {
-        if (err) {
-          console.error(err);
-          showStatus("Error al iniciar el escáner: " + err.message, true);
-          isScanning = false;
-          btnStart.disabled = false;
-          btnStop.disabled = true;
-          return;
+            // Evento eliminar
+            fila.querySelector(".eliminar").onclick = () => {
+                codigosCapturados.delete(codigo);
+                fila.remove();
+            };
         }
 
-        Quagga.start();
-        showStatus("Escáner iniciado. Apunta la cámara al código de barras.");
-      });
+        // ================================
+        //      EXPORTAR A EXCEL
+        // ================================
+        document.getElementById("btnExcel").onclick = () => {
+            const datos = [];
+            document.querySelectorAll("#tablaDatos tbody tr").forEach(tr => {
+                const tds = tr.querySelectorAll("td");
+                datos.push({
+                    Codigo: tds[0].innerText,
+                    Descripcion: tds[1].innerText,
+                    Fecha: tds[2].innerText,
+                    Ubicacion: tds[3].innerText,
+                    Usuario: tds[4].innerText,
+                    Observaciones: tds[5].innerText
+                });
+            });
 
-      Quagga.offDetected(onDetected); // asegura no duplicar listener
-      Quagga.onDetected(onDetected);
-    }
+            const hoja = XLSX.utils.json_to_sheet(datos);
+            const libro = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(libro, hoja, "Datos");
 
-    function stopScanner() {
-      if (!isScanning) return;
+            XLSX.writeFile(libro, "escaneos.xlsx");
+        };
+    </script>
 
-      Quagga.stop();
-      Quagga.offDetected(onDetected);
-      isScanning = false;
-      btnStart.disabled = false;
-      btnStop.disabled = true;
-      showStatus("Escáner detenido.");
-    }
-
-    function onDetected(result) {
-      if (!result || !result.codeResult || !result.codeResult.code) return;
-
-      const code = result.codeResult.code.trim();
-      // Pequeño "debounce": algunos navegadores leen varias veces el mismo código
-      addScan(code, false);
-    }
-
-    // ==============================
-    // Exportar a Excel (SheetJS)
-    // ==============================
-    function exportToExcel() {
-      if (!scans.length) return;
-
-      // Transformar los datos al formato requerido
-      const dataForExcel = scans.map(item => ({
-        "Código": item.code,
-        "Descripción": item.description || "",
-        "Fecha escaneo": formatDate(item.dateISO),
-        "Ubicación": item.location || "",
-        "Usuario": item.user || "",
-        "Observaciones": item.notes || ""
-      }));
-
-      // Crear hoja
-      const ws = XLSX.utils.json_to_sheet(dataForExcel, { header: [
-        "Código",
-        "Descripción",
-        "Fecha escaneo",
-        "Ubicación",
-        "Usuario",
-        "Observaciones"
-      ]});
-
-      // Ajustar ancho de columnas (opcional)
-      const colWidths = [
-        { wch: 20 }, // Código
-        { wch: 30 }, // Descripción
-        { wch: 20 }, // Fecha
-        { wch: 20 }, // Ubicación
-        { wch: 20 }, // Usuario
-        { wch: 30 }  // Observaciones
-      ];
-      ws["!cols"] = colWidths;
-
-      // Crear libro y agregar hoja
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Escaneos");
-
-      // Generar archivo y descargar
-      const fecha = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      const fileName = `escaneos-${fecha}.xlsx`;
-
-      XLSX.writeFile(wb, fileName);
-    }
-
-    // ==============================
-    // Listeners de UI
-    // ==============================
-    btnStart.addEventListener("click", startScanner);
-    btnStop.addEventListener("click", stopScanner);
-
-    btnClear.addEventListener("click", () => {
-      if (!scans.length) return;
-      if (!confirm("¿Seguro que quieres borrar todas las entradas?")) return;
-      scans = [];
-      scannedCodes.clear();
-      renderTable();
-      showStatus("Tabla limpiada.");
-    });
-
-    btnAddManual.addEventListener("click", () => {
-      const code = inputCodigoManual.value.trim();
-      if (!code) {
-        showStatus("Ingresa un código manual antes de agregar.", true);
-        return;
-      }
-      addScan(code, true);
-    });
-
-    inputCodigoManual.addEventListener("keyup", (e) => {
-      if (e.key === "Enter") {
-        btnAddManual.click();
-      }
-    });
-
-    // Guardar cambios de celdas editables en el array scans
-    tableBody.addEventListener("input", (e) => {
-      const field = e.target.dataset.field;
-      if (!field) return;
-      const tr = e.target.closest("tr");
-      if (!tr) return;
-      const idx = Number(tr.dataset.index);
-      if (Number.isNaN(idx) || !scans[idx]) return;
-      scans[idx][field] = e.target.textContent.trim();
-    });
-
-    // Botón eliminar por fila (delegación)
-    tableBody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-action='delete']");
-      if (!btn) return;
-      const tr = btn.closest("tr");
-      const idx = Number(tr.dataset.index);
-      if (Number.isNaN(idx)) return;
-      deleteScanAtIndex(idx);
-    });
-
-    // Filtro de búsqueda
-    inputFiltro.addEventListener("input", () => {
-      renderTable();
-    });
-
-    // ==============================
-    // PWA: registrar Service Worker (opcional)
-    // ==============================
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("js/sw.js").catch(err => {
-          console.warn("No se pudo registrar el Service Worker:", err);
-        });
-      });
-    }
-
-  </script>
 </body>
 </html>
