@@ -31,6 +31,10 @@
             Detener Escáner
         </button>
     </div>
+<div class="relative">
+    <video id="preview" class="w-full rounded"></video>
+    <canvas id="canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+</div>
 
     <!-- Tabla -->
     <h2 class="text-xl font-bold mb-2">Datos Escaneados</h2>
@@ -62,6 +66,61 @@
     </button>
 
     <script>
+      const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// Redibujar cada frame recibido
+Quagga.onProcessed(result => {
+    const ctx = canvas.getContext("2d");
+    const video = document.getElementById("preview");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Limpiar canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Si detecta cajas
+    if (result && result.boxes) {
+        result.boxes
+            .filter(box => box !== result.box)
+            .forEach(box => {
+                ctx.beginPath();
+                ctx.strokeStyle = "yellow";
+                ctx.lineWidth = 2;
+                box.forEach((p, i) => {
+                    if (i === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                });
+                ctx.closePath();
+                ctx.stroke();
+            });
+    }
+
+    // Caja principal (en verde)
+    if (result && result.box) {
+        ctx.beginPath();
+        ctx.strokeStyle = "lime";
+        ctx.lineWidth = 4;
+        result.box.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+        ctx.closePath();
+        ctx.stroke();
+    }
+
+    // Línea del código detectado
+    if (result && result.codeResult && result.line) {
+        ctx.beginPath();
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 3;
+        ctx.moveTo(result.line[0].x, result.line[0].y);
+        ctx.lineTo(result.line[1].x, result.line[1].y);
+        ctx.stroke();
+    }
+});
+
         const tabla = document.querySelector("#tablaDatos tbody");
         const codigosCapturados = new Set();
 
